@@ -1,0 +1,210 @@
+#include <Arduino.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include "MAX30105.h"
+#include "spo2_algorithm.h"
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+// OLED SPI
+#define OLED_MOSI 18
+#define OLED_CLK  19
+#define OLED_DC   4
+#define OLED_CS   5
+#define OLED_RESET 2
+
+// MAX30102 I2C
+#define I2C_SDA 6
+#define I2C_SCL 7
+#define BUFFER_LENGTH 100
+
+#define BUZZER_PIN 10
+#define FLUID_SENSOR 11
+
+Adafruit_SSD1306 display(
+    SCREEN_WIDTH, SCREEN_HEIGHT,
+    OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS
+);
+
+MAX30105 particleSensor;
+
+uint32_t irBuffer[BUFFER_LENGTH];
+uint32_t redBuffer[BUFFER_LENGTH];
+
+int32_t spo2 = 0;
+int8_t validSPO2 = 0;
+int32_t heartRate = 0;
+int8_t validHeartRate = 0;
+
+bool maxReady = false;
+long lastIR = 0;
+
+void buzzerOn(int freq) {
+    ledcAttach(BUZZER_PIN, freq, 8);
+    ledcWrite(BUZZER_PIN, 30);
+}
+
+void buzzerOff() {
+    ledcWrite(BUZZER_PIN, 0);
+    ledcDetach(BUZZER_PIN);
+}
+
+void readMaxSamples(int start, int end) {
+    for (int i = start; i < end; i++) {
+        while (!particleSensor.available()) {
+            particleSensor.check();
+        }
+
+        redBuffer[i] = particleSensor.getRed();
+        irBuffer[i] = particleSensor.getIR();
+        particleSensor.nextSample();
+    }
+}
+
+void initMAX30102() {
+    Wire.begin(I2C_SDA, I2C_SCL);
+
+    if (!particleSensor.begin(Wire, I2C_SPEED_STANDARD)) {
+        Serial.println("MAX30102 NOT FOUND");
+        maxReady = false;
+        return;
+    }
+
+    Serial.println("MAX30102 OK");
+    maxReady = true;
+
+    particleSensor.setup(0x3F, 4, 2, 100, 411, 16384);
+    particleSensor.setPulseAmplitudeRed(0x3F);
+    particleSensor.setPulseAmplitudeIR(0x3F);
+    particleSensor.setPulseAmplitudeGreen(0);
+
+    Serial.println("Place finger on sensor...");
+    readMaxSamples(0, BUFFER_LENGTH);
+
+    maxim_heart_rate_and_oxygen_saturation(
+        irBuffer,
+        BUFFER_LENGTH,
+        redBuffer,
+        &spo2,
+        &validSPO2,
+        &heartRate,
+        &validHeartRate
+    );
+}
+
+void updateMAX30102() {
+    if (!maxReady) return;
+
+    for (int i = 25; i < BUFFER_LENGTH; i++) {
+        redBuffer[i - 25] = redBuffer[i];
+        irBuffer[i - 25] = irBuffer[i];
+    }
+
+    readMaxSamples(75, BUFFER_LENGTH);
+
+    maxim_heart_rate_and_oxygen_saturation(
+        irBuffer,
+        BUFFER_LENGTH,
+        redBuffer,
+        &spo2,
+        &validSPO2,
+        &heartRate,
+        &validHeartRate
+    );
+
+    lastIR = irBuffer[BUFFER_LENGTH - 1];
+}
+
+void drawScreen(bool fluidDetected, int rawValue) {
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+
+    display.setCursor(8, 0);
+    display.println("VITALGUARD TEST");
+    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+
+    display.setCursor(0, 14);
+    display.print("Fluid: ");
+    display.print(fluidDetected ? "OK" : "LOW");
+    display.print(" raw:");
+    display.println(rawValue);
+
+    display.setCursor(0, 26);
+    display.print("HR: ");
+    display.print(validHeartRate ? heartRate : 0);
+    display.println(" BPM");
+
+    display.setCursor(0, 38);
+    display.print("SpO2: ");
+    display.print(validSPO2 ? spo2 : 0);
+    display.println(" %");
+
+    display.setCursor(0, 50);
+
+    if (!maxReady) {
+        display.println("MAX30102 ERROR");
+    } else if (lastIR < 50000) {
+        display.println("No finger");
+    } else if (!fluidDetected) {
+        display.println("ALERT: Fluid LOW");
+    } else {
+        display.println("Status: OK");
+    }
+
+    display.display();
+}
+
+void setup() {
+    Serial.begin(115200);
+    delay(3000);
+
+    pinMode(BUZZER_PIN, OUTPUT);
+    pinMode(FLUID_SENSOR, INPUT);
+
+    if (!display.begin(SSD1306_SWITCHCAPVCC)) {
+        Serial.println("OLED ERROR");
+        while (true);
+    }
+
+    Serial.println("OLED OK!");
+
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    display.setCursor(15, 25);
+    display.println("SYSTEM READY");
+    display.display();
+    delay(1500);
+
+    initMAX30102();
+}
+
+void loop() {
+    int fluidValue = digitalRead(FLUID_SENSOR);
+    bool fluidDetected = (fluidValue == HIGH);
+
+    updateMAX30102();
+
+    drawScreen(fluidDetected, fluidValue);
+
+    if (!fluidDetected) {
+        buzzerOn(2000);
+    } else {
+        buzzerOff();
+    }
+
+    Serial.print("Fluid=");
+    Serial.print(fluidValue);
+    Serial.print(" HR=");
+    Serial.print(validHeartRate ? heartRate : 0);
+    Serial.print(" SpO2=");
+    Serial.print(validSPO2 ? spo2 : 0);
+    Serial.print(" IR=");
+    Serial.println(lastIR);
+
+    delay(300);
+}
