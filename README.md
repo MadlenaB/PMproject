@@ -142,28 +142,6 @@ Dashboard-ul afișează:
 
 ---
 
-## Cum uploadezi codul
-
-1. Conectează ESP32-C6 prin cablu USB-C cu date
-2. Deschide proiectul în VS Code cu PlatformIO
-3. Apasă Upload (săgeata →)
-4. Deschide Serial Monitor la 115200 baud
-5. Apasă RESET pe ESP32
-
----
-
-## Probleme cunoscute și soluții
-
-| Problemă | Cauză | Soluție |
-|---|---|---|
-| Serial Monitor gol | ESP32-C6 USB nativ | Adaugă build_flags în platformio.ini |
-| OLED nu funcționează | Adresă greșită sau pini SPI inversați | Verifică conexiunile și tipul SPI/I2C |
-| SEN0204 citește mereu 0 | Divizor de tensiune taie semnalul | Conectează direct la GPIO |
-| Buzzer nu sună | tone() incompatibil ESP32-C6 | Folosește ledcAttach() / ledcWrite() |
-| MAX30102 not found | Pini header nelipiți | Lipește pinii cu lipitoare |
-
----
-
 ## Bibliografie
 
 ### Hardware
