@@ -62,61 +62,7 @@ Proiectul propune realizarea unui sistem embedded pentru monitorizarea în timp 
 
 ## Schema de conexiuni
 
-### SEN0204 — Senzor nivel lichid
-- Fir maro (VCC) → 5V (VIN ESP32 sau MT3608 OUT)
-- Fir albastru (GND) → GND
-- Fir galben (OUT) → GPIO11
-
-> Senzorul funcționează direct fără divizor de tensiune deoarece semnalul OUT nu depășește 3.3V în practică.
-
-### AD8232 — Modul ECG
-- VCC → 3.3V
-- GND → GND
-- OUTPUT → GPIO0 (ADC)
-- LO+ → GPIO1
-- LO- → GPIO2
-
-**Plasare electrozi:**
-- Roșu (RA) → sub claviculă dreapta
-- Galben (LA) → sub claviculă stângă
-- Verde (RL) → abdomen stânga jos
-
-### OLED 128x64 — SPI
-- VCC → 3.3V
-- GND → GND
-- MOSI/DIN → GPIO7
-- CLK → GPIO6
-- DC → GPIO4
-- CS → GPIO5
-- RESET → GPIO3
-
-### MAX30102 — Pulsoximetru
-- VCC → 3.3V
-- GND → GND
-- SDA → GPIO20
-- SCL → GPIO21
-
-> Ține degetul arătător ușor pe senzor, nemișcat, 5-10 secunde pentru citire corectă.
-
-### Buzzer KY-006 — Pasiv
-- S (semnal) → GPIO10
-- - (GND) → GND
-
-### TP4056 — Modul încărcare LiPo
-- B+ → fir roșu baterie LiPo
-- B- → fir negru baterie LiPo
-- OUT+ → VIN ESP32
-- OUT- → GND
-
-### MT3608 — Boost DC-DC
-- IN+ → VIN ESP32 (sau OUT+ TP4056)
-- IN- → GND
-- OUT+ → VCC SEN0204
-- OUT- → GND
-
-> Reglează potențiometrul MT3608 până măsori 5V la ieșire înainte de a conecta SEN0204.
-
----
+![Schema de conexiuni](schema_electrica_esp.png)
 
 ## Software
 
